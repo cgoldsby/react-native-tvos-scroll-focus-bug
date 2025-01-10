@@ -1,10 +1,14 @@
 {
-  "name": "TVTest",
+  "name": "tvtest",
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "clean": "watchman watch-del-all && rm -rf node_modules && npm cache clean --force && git clean -xdf",
     "android": "react-native run-android",
     "ios": "react-native run-ios",
+    "tvos": "(cd ios && pod install) && react-native run-ios --simulator='Apple TV'",
+    "tvos-old-arch": "bundle i && (cd ios && RCT_NEW_ARCH_ENABLED=0 bundle exec pod install) && react-native run-ios --simulator='Apple TV'",
+    "tvos-oa": "npm run tvos-old-arch",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
