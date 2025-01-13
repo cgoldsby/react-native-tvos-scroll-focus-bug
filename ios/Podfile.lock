@@ -1728,16 +1728,16 @@ SPEC CHECKSUMS:
   React-CoreModules: 199a1e1a41917b5f9ab37278e79aa9821c94642f
   React-cxxreact: b3fd3879219d62f3e81a4249e79b7b0d20a88386
   React-debug: 622823878a89c3b33a5b31763bada14e3340a3c0
-  React-defaultsnativemodule: 31a12967905fc9caa9378db551376c7c7f42537f
-  React-domnativemodule: 29e467b5a57b81842e46be7fbe0cd57d57813a44
+  React-defaultsnativemodule: 7201fd7777352cc7d23ea40fb40717c3d6912d38
+  React-domnativemodule: 624b21d68f3f66a43ab1e71cc04bb937bbe33fc9
   React-Fabric: 3a8516d2108610a8fb599e2b6f6d178a5488b100
   React-FabricComponents: 8af539589c4bb0343ba251e483a3eca1c16f3a94
   React-FabricImage: bc893dc945860b89f040602f7259302455ef5025
   React-featureflags: df413ce2118d9e254785070468864207c50b27c6
-  React-featureflagsnativemodule: f67d97d0aa9665e95a79e261a3ffed0a6df13644
+  React-featureflagsnativemodule: 77d34bb9589bad14f2472deebc292b85f08ef23e
   React-graphics: 66611a434c9ed562e132c83178f906fd59b8fd7d
   React-hermes: 1b93084e5db5d1d7fd06395207ad2ca07314ad22
-  React-idlecallbacksnativemodule: 380c3328015429d529282cae203938f8761672a7
+  React-idlecallbacksnativemodule: bba356dbaa312f9575b04fc11aabf103cf61b141
   React-ImageManager: 766715982c915077dac48c3dbfbd1adde4b7adf4
   React-jserrorhandler: a24de7867e347f3aa2d187a24e1d14b78591fe80
   React-jsi: d92d0f82c18210e9d694a14772c571fafec4e64a
@@ -1746,16 +1746,16 @@ SPEC CHECKSUMS:
   React-jsitracing: 1385a00556abc11d0c4b6067c060e80c307fb7e0
   React-logger: ae72e5210d90796d4bd6f152e844b4153933b193
   React-Mapbuffer: fd5a91a83de0a8411f982d63ec7025b0ad67b347
-  React-microtasksnativemodule: 1e7423f15ba5848f94468b56ee04b5d32892e57f
+  React-microtasksnativemodule: 2423d14e433e75197cfa257f222f0b89d408a583
   React-nativeconfig: ff3ab22f9751844a66a0b8250523a0f152828211
   React-NativeModulesApple: 3fdd606df65fdb10d905dda89964964cced6921c
   React-perflogger: 527f62a80b54b66a9bdbbf0d3a09fbcd8d8341f7
   React-performancetimeline: a3cb61ca7824c544531db9ff13f9c3a1e0a55a18
   React-RCTActionSheet: 403bbdc9cbada2f621d21f7de4e3125e42a4435f
   React-RCTAnimation: d78976aaba3cbcb985a6e2a3cf7a0ca8d996a5f8
-  React-RCTAppDelegate: 6dd1cc5069fba053885347e39bbc2d93bca2900a
+  React-RCTAppDelegate: a698131f5daaba99b0b60e992427af947db3a827
   React-RCTBlob: adb2919c2db3c347b8e7003cb876cb0eeddb7145
-  React-RCTFabric: 7b58960efaaf6d16a6726302bed8dea5eb728bc2
+  React-RCTFabric: b8b16bd49d2bfffa0d888abdefb964da083a7eee
   React-RCTImage: aab8e860a89926751049474fff473b6fc089eb54
   React-RCTLinking: 3c7efc3dd4f14b8d650ead9a45533d20fe149110
   React-RCTNetwork: 585d455cfc9bbc8e782e472371a027a2d8acccd5
@@ -1779,4 +1779,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 114f0c382a27e692cbdce684b13dc8f829a3227f
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2
