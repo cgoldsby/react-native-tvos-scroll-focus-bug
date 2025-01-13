@@ -1,3 +1,6 @@
+## Description
+Demo app for https://github.com/react-native-tvos/react-native-tvos/issues/857
+
 ## Step 1: Setup
 ```bash
 yarn
