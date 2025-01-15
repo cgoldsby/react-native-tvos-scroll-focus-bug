@@ -6,6 +6,8 @@
  */
 import {useState} from 'react';
 import{
+  Dimensions,
+  PixelRatio,
   StyleSheet,
   SafeAreaView,
   Text,
@@ -15,6 +17,24 @@ import{
   Pressable,
   PressableProps,
 } from 'react-native';
+
+const BASE_WIDTH = 1920;
+
+const {width: screenWidth} = Dimensions.get('window');
+const scale = screenWidth / BASE_WIDTH;
+
+const toDp = (size) => {
+  if (isNaN(size) || typeof size !== 'number') {
+      console.warn('toDp: Size must be a number!');
+
+      return 0;
+  }
+
+  const scaledSize = size * scale;
+
+  return PixelRatio.roundToNearestPixel(scaledSize);
+};
+
 
 LogBox.ignoreLogs([
   'Sending `appearanceChanged` with no listeners registered.',
@@ -38,6 +58,8 @@ const Button: FunctionComponent<PressableProps & {text: string}> = props => {
     </Pressable>
   );
 };
+
+const isNewArchitecture = !!global.__turboModuleProxy;
 
 const App = () => {
   const [scrollEnabled, setScrollEnabled] = useState(false);
@@ -112,6 +134,9 @@ const App = () => {
           </TVTextScrollView>
         </View>
         <Button text={'Footer'} isTVSelectable={headerFocusable} />
+        <Text style={[styles.text, {fontWeight: 'bold'}]}>
+        {`This app is using the ${isNewArchitecture ? 'New' : 'Old'} Architecture.`}
+      </Text>
       </View>
       <Button style={{height: '100%', width: 180}}text={'Right'} isTVSelectable={headerFocusable} />
 
@@ -127,35 +152,35 @@ const styles = StyleSheet.create({
   },
   text: {
     color: '#EDF2F4',
-    fontSize: 28,
+    fontSize: toDp(28),
   },
   listContainer: {
     width: '25%',
-    margin: 10,
-    gap: 50,
+    margin: toDp(10),
+    gap: toDp(50),
   },
   textContainer: {
     flex: 1,
     alignItems: 'center',
-    gap: 20,
+    gap: toDp(20),
   },
   textHeader: {
     fontWeight: 'bold',
-    fontSize: 32,
+    fontSize: toDp(32),
   },
   button: {
     width: '80%',
-    borderRadius: 10,
+    borderRadius: toDp(10),
     backgroundColor: '#8D99AE',
     justifyContent: 'center',
     alignItems: 'center',
   },
   buttonText: {
     color: '#2B2D42',
-    fontSize: 38,
+    fontSize: toDp(38),
     textAlign: 'center',
     fontWeight: 'bold',
-    padding: 38,
+    padding: toDp(38),
   },
   buttonPressed: {
     backgroundColor: '#8D99AE',
