@@ -1,8 +1,80 @@
 diff --git a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/ScrollView/RCTScrollViewComponentView.mm b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/ScrollView/RCTScrollViewComponentView.mm
-index 3304c61..c35dc2b 100644
+index 3304c61..4868f8a 100644
 --- a/node_modules/react-native/React/Fabric/Mounting/ComponentViews/ScrollView/RCTScrollViewComponentView.mm
 +++ b/node_modules/react-native/React/Fabric/Mounting/ComponentViews/ScrollView/RCTScrollViewComponentView.mm
-@@ -1030,18 +1030,20 @@ - (void)didUpdateFocusInContext:(UIFocusUpdateContext *)context
+@@ -27,6 +27,7 @@
+ #if TARGET_OS_TV
+ #import <React/RCTTVRemoteHandler.h>
+ #import <React/RCTTVNavigationEventNotification.h>
++#import "React/RCTI18nUtil.h"
+ #endif
+ 
+ using namespace facebook::react;
+@@ -193,16 +194,18 @@ - (void)_keyboardWillChangeFrame:(NSNotification *)notification
+   UIViewAnimationCurve curve =
+       (UIViewAnimationCurve)[notification.userInfo[UIKeyboardAnimationCurveUserInfoKey] unsignedIntegerValue];
+   CGRect keyboardEndFrame = [notification.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
++  CGRect keyboardBeginFrame = [notification.userInfo[UIKeyboardFrameBeginUserInfoKey] CGRectValue];
+ 
+   CGPoint absoluteViewOrigin = [self convertPoint:self.bounds.origin toView:nil];
+   CGFloat scrollViewLowerY = isInverted ? absoluteViewOrigin.y : absoluteViewOrigin.y + self.bounds.size.height;
+ 
+   UIEdgeInsets newEdgeInsets = _scrollView.contentInset;
+   CGFloat inset = MAX(scrollViewLowerY - keyboardEndFrame.origin.y, 0);
++  const auto &props = static_cast<const ScrollViewProps &>(*_props);
+   if (isInverted) {
+-    newEdgeInsets.top = MAX(inset, _scrollView.contentInset.top);
++    newEdgeInsets.top = MAX(inset, props.contentInset.top);
+   } else {
+-    newEdgeInsets.bottom = MAX(inset, _scrollView.contentInset.bottom);
++    newEdgeInsets.bottom = MAX(inset, props.contentInset.bottom);
+   }
+ 
+   CGPoint newContentOffset = _scrollView.contentOffset;
+@@ -214,21 +217,18 @@ - (void)_keyboardWillChangeFrame:(NSNotification *)notification
+                                                from:self
+                                            forEvent:nil]) {
+     if (CGRectEqualToRect(_firstResponderFocus, CGRectNull)) {
+-      // Text input view is outside of the scroll view.
+-      return;
+-    }
+-
+-    CGRect viewIntersection = CGRectIntersection(self.firstResponderFocus, keyboardEndFrame);
+-
+-    if (CGRectIsNull(viewIntersection)) {
+-      return;
+-    }
+-
+-    // Inner text field focused
+-    CGFloat focusEnd = CGRectGetMaxY(self.firstResponderFocus);
+-    if (focusEnd > keyboardEndFrame.origin.y) {
+-      // Text field active region is below visible area with keyboard - update diff to bring into view
+-      contentDiff = keyboardEndFrame.origin.y - focusEnd;
++      UIView *inputAccessoryView = _firstResponderViewOutsideScrollView.inputAccessoryView;
++      if (inputAccessoryView) {
++        // Text input view is within the inputAccessoryView.
++        contentDiff = keyboardEndFrame.origin.y - keyboardBeginFrame.origin.y;
++      }
++    } else {
++      // Inner text field focused
++      CGFloat focusEnd = CGRectGetMaxY(self.firstResponderFocus);
++      if (focusEnd > keyboardEndFrame.origin.y) {
++        // Text field active region is below visible area with keyboard - update diff to bring into view
++        contentDiff = keyboardEndFrame.origin.y - focusEnd;
++      }
+     }
+   }
+ 
+@@ -254,7 +254,7 @@ - (void)_keyboardWillChangeFrame:(NSNotification *)notification
+                    animations:^{
+                      self->_scrollView.contentInset = newEdgeInsets;
+                      self->_scrollView.verticalScrollIndicatorInsets = newEdgeInsets;
+-                     [self scrollToOffset:newContentOffset animated:NO];
++                     [self scrollTo:newContentOffset.x y:newContentOffset.y animated:NO];
+                    }
+                    completion:nil];
+ }
+@@ -1030,18 +1030,23 @@ - (void)didUpdateFocusInContext:(UIFocusUpdateContext *)context
          [self sendBlurNotification];
          [self removeSwipeGestureRecognizers];
          [self resignFirstResponder];
@@ -11,7 +83,10 @@ index 3304c61..c35dc2b 100644
 -        // Similarly for left and right
 +        // If scrolling is enabled:
 +        // - Scroll to the top when moving up and to the bottom when moving down.
-+        // - Similarly, scroll to the left when moving left and to the right when moving right.
++        // - Similarly, scroll towards leading edge when moving towards leading edge and to the trailing edge when moving towards the trailing edge.
++        BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++        BOOL isMovingTowardsLeadingEdge = (isRTL ? context.focusHeading == UIFocusHeadingRight : context.focusHeading == UIFocusHeadingLeft);
++        BOOL isMovingTowardsTrailingEdge = (isRTL ? context.focusHeading == UIFocusHeadingLeft : context.focusHeading == UIFocusHeadingRight);
          RCTEnhancedScrollView *scrollView = (RCTEnhancedScrollView *)_scrollView;
 -        if (context.focusHeading == UIFocusHeadingUp && scrollView.snapToStart) {
 -            [self swipeVerticalScrollToOffset:0.0];
@@ -26,15 +101,15 @@ index 3304c61..c35dc2b 100644
 +                [self scrollToVerticalOffset:0.0];
 +            } else if(context.focusHeading == UIFocusHeadingDown && scrollView.snapToEnd) {
 +                [self scrollToVerticalOffset:scrollView.contentSize.height];
-+            } else if(context.focusHeading == UIFocusHeadingLeft && scrollView.snapToStart) {
++            } else if(isMovingTowardsLeadingEdge && scrollView.snapToStart) {
 +                [self scrollToHorizontalOffset:0.0];
-+            } else if(context.focusHeading == UIFocusHeadingRight && scrollView.snapToEnd) {
++            } else if(isMovingTowardsTrailingEdge && scrollView.snapToEnd) {
 +                [self scrollToHorizontalOffset:scrollView.contentSize.width];
 +            }
          }
      }
  }
-@@ -1100,19 +1102,26 @@ - (void)handleTVNavigationEventNotification:(NSNotification *)notif
+@@ -1100,22 +1105,34 @@ - (void)handleTVNavigationEventNotification:(NSNotification *)notif
  
  - (BOOL)shouldUpdateFocusInContext:(UIFocusUpdateContext *)context
  {
@@ -43,17 +118,23 @@ index 3304c61..c35dc2b 100644
 +        return [super shouldUpdateFocusInContext:context];
 +    }
 +
++    // Determine if the layout is Right-to-Left
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
      BOOL isHorizontal = _scrollView.contentSize.width > self.frame.size.width;
-     // Keep focus inside the scroll view till the end of the content
+-    // Keep focus inside the scroll view till the end of the content
++    // Adjust for horizontal scrolling with RTL support
      if (isHorizontal) {
 -        if ((context.focusHeading == UIFocusHeadingLeft && self.scrollView.contentOffset.x > 0)
 -            || (context.focusHeading == UIFocusHeadingRight && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - self.scrollView.visibleSize.width)
 -        ) {
 -            return [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem];
-+        BOOL isMovingLeft = (context.focusHeading == UIFocusHeadingLeft && self.scrollView.contentOffset.x > 0);
-+        BOOL isMovingRight = (context.focusHeading == UIFocusHeadingRight && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - MAX(self.scrollView.visibleSize.width, 1));
++        BOOL isMovingTowardsLeadingEdge = (isRTL ? context.focusHeading == UIFocusHeadingRight : context.focusHeading == UIFocusHeadingLeft);
++        BOOL isMovingTowardsTrailingEdge = (isRTL ? context.focusHeading == UIFocusHeadingLeft : context.focusHeading == UIFocusHeadingRight);
 +
-+        if (isMovingLeft || isMovingRight) {
++        BOOL isScrollingToLeading = (isMovingTowardsLeadingEdge && self.scrollView.contentOffset.x > 0);
++        BOOL isScrollingToTrailing = (isMovingTowardsTrailingEdge && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - MAX(self.scrollView.visibleSize.width, 1));
++
++        if (isScrollingToLeading || isScrollingToTrailing) {
 +            return (context.nextFocusedItem && [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem]);
          }
      } else {
@@ -61,6 +142,7 @@ index 3304c61..c35dc2b 100644
 -            || (context.focusHeading == UIFocusHeadingDown && self.scrollView.contentOffset.y < self.scrollView.contentSize.height - self.scrollView.visibleSize.height)
 -        ) {
 -            return [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem];
++        // Handle vertical scrolling as before
 +        BOOL isMovingUp = (context.focusHeading == UIFocusHeadingUp && self.scrollView.contentOffset.y > 0);
 +        BOOL isMovingDown = (context.focusHeading == UIFocusHeadingDown && self.scrollView.contentOffset.y < self.scrollView.contentSize.height - MAX(self.scrollView.visibleSize.height, 1));
 +
@@ -68,8 +150,11 @@ index 3304c61..c35dc2b 100644
 +            return (context.nextFocusedItem && [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem]);
          }
      }
+-
+     return [super shouldUpdateFocusInContext:context];
+ }
  
-@@ -1157,13 +1166,23 @@ - (NSTimeInterval)swipeDuration
+@@ -1157,60 +1174,100 @@ - (NSTimeInterval)swipeDuration
      return duration;
  }
  
@@ -94,8 +179,9 @@ index 3304c61..c35dc2b 100644
 +
          [UIView animateWithDuration:[self swipeDuration] animations:^{
              self.scrollView.contentOffset =
-                 CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
-@@ -1171,13 +1190,23 @@ - (void)swipeVerticalScrollToOffset:(CGFloat)yOffset
+-                CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
++            CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
+         }];
      });
  }
  
@@ -120,8 +206,11 @@ index 3304c61..c35dc2b 100644
 +
          [UIView animateWithDuration:[self swipeDuration] animations:^{
              self.scrollView.contentOffset =
-                 CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
-@@ -1187,30 +1216,46 @@ - (void)swipeHorizontalScrollToOffset:(CGFloat)xOffset
+-                CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
++            CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
+         }];
+     });
+ }
  
  - (void)swipedUp
  {
@@ -149,11 +238,14 @@ index 3304c61..c35dc2b 100644
  
  - (void)swipedLeft
  {
+-    CGFloat newOffset = self.scrollView.contentOffset.x - [self swipeHorizontalInterval];
 +    if (!self.scrollView.scrollEnabled) {
 +        return;
 +    }
 +
-     CGFloat newOffset = self.scrollView.contentOffset.x - [self swipeHorizontalInterval];
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++    NSInteger horizontalInterval = [self swipeHorizontalInterval];
++    CGFloat newOffset = self.scrollView.contentOffset.x + (isRTL ? horizontalInterval : -horizontalInterval);
      // NSLog(@"Swiped left to %f", newOffset);
 -    [self swipeHorizontalScrollToOffset:newOffset];
 +    [self scrollToHorizontalOffset:newOffset];
@@ -161,22 +253,125 @@ index 3304c61..c35dc2b 100644
  
  - (void)swipedRight
  {
+-    CGFloat newOffset = self.scrollView.contentOffset.x + [self swipeHorizontalInterval];
 +    if (!self.scrollView.scrollEnabled) {
 +        return;
 +    }
 +
-     CGFloat newOffset = self.scrollView.contentOffset.x + [self swipeHorizontalInterval];
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++    NSInteger horizontalInterval = [self swipeHorizontalInterval];
++    CGFloat newOffset = self.scrollView.contentOffset.x + (isRTL ? -horizontalInterval : horizontalInterval);
      // NSLog(@"Swiped right to %f", newOffset);
 -    [self swipeHorizontalScrollToOffset:newOffset];
 +    [self scrollToHorizontalOffset:newOffset];
  }
  
  - (void)addSwipeGestureRecognizers
+diff --git a/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.h b/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.h
+new file mode 100644
+index 0000000..1b60419
+--- /dev/null
++++ b/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.h
+@@ -0,0 +1,34 @@
++
++/*
++ * This code was generated by [react-native-codegen](https://www.npmjs.com/package/react-native-codegen).
++ *
++ * Do not edit this file as changes may cause incorrect behavior and will be lost
++ * once the code is regenerated.
++ *
++ * @generated by GenerateRCTThirdPartyFabricComponentsProviderH
++ */
++
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
++
++#import <React/RCTComponentViewProtocol.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++Class<RCTComponentViewProtocol> RCTThirdPartyFabricComponentsProvider(const char *name);
++#if RCT_NEW_ARCH_ENABLED
++#ifndef RCT_DYNAMIC_FRAMEWORKS
++
++
++
++#endif
++#endif
++
++#ifdef __cplusplus
++}
++#endif
++
++#pragma GCC diagnostic pop
++
+diff --git a/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.mm b/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.mm
+new file mode 100644
+index 0000000..8974c50
+--- /dev/null
++++ b/node_modules/react-native/React/Fabric/RCTThirdPartyFabricComponentsProvider.mm
+@@ -0,0 +1,33 @@
++
++/**
++ * This code was generated by [react-native-codegen](https://www.npmjs.com/package/react-native-codegen).
++ *
++ * Do not edit this file as changes may cause incorrect behavior and will be lost
++ * once the code is regenerated.
++ *
++ * @generated by GenerateRCTThirdPartyFabricComponentsProviderCpp
++ */
++
++// OSS-compatibility layer
++
++#import "RCTThirdPartyFabricComponentsProvider.h"
++
++#import <string>
++#import <unordered_map>
++
++Class<RCTComponentViewProtocol> RCTThirdPartyFabricComponentsProvider(const char *name) {
++  static std::unordered_map<std::string, Class (*)(void)> sFabricComponentsClassMap = {
++    #if RCT_NEW_ARCH_ENABLED
++    #ifndef RCT_DYNAMIC_FRAMEWORKS
++
++    #endif
++    #endif
++  };
++
++  auto p = sFabricComponentsClassMap.find(name);
++  if (p != sFabricComponentsClassMap.end()) {
++    auto classFunc = p->second;
++    return classFunc();
++  }
++  return nil;
++}
 diff --git a/node_modules/react-native/React/Views/ScrollView/RCTScrollView.m b/node_modules/react-native/React/Views/ScrollView/RCTScrollView.m
-index e9db4d2..24538f5 100644
+index e9db4d2..5b0f4f5 100644
 --- a/node_modules/react-native/React/Views/ScrollView/RCTScrollView.m
 +++ b/node_modules/react-native/React/Views/ScrollView/RCTScrollView.m
-@@ -1018,19 +1018,20 @@ - (void)didUpdateFocusInContext:(UIFocusUpdateContext *)context
+@@ -23,6 +23,7 @@
+ #if TARGET_OS_TV
+ #import "RCTTVRemoteHandler.h"
+ #import "RCTTVNavigationEventNotification.h"
++#import "React/RCTI18nUtil.h"
+ #endif
+ 
+ #if !TARGET_OS_TV
+@@ -362,6 +363,12 @@ - (void)_keyboardWillChangeFrame:(NSNotification *)notification
+     if (!didFocusExternalTextField && focusEnd > endFrame.origin.y) {
+       // Text field active region is below visible area with keyboard - update diff to bring into view
+       contentDiff = endFrame.origin.y - focusEnd;
++    } else {
++      UIView *inputAccessoryView = _firstResponderViewOutsideScrollView.inputAccessoryView;
++      if (inputAccessoryView) {
++        // Text input view is within the inputAccessoryView.
++        contentDiff = endFrame.origin.y - beginFrame.origin.y;
++      }
+     }
+   } else if (endFrame.origin.y <= beginFrame.origin.y) {
+     // Keyboard opened for other reason
+@@ -1018,19 +1025,23 @@ - (void)didUpdateFocusInContext:(UIFocusUpdateContext *)context
          [self sendBlurNotification];
          [self removeSwipeGestureRecognizers];
          [self resignFirstResponder];
@@ -193,15 +388,18 @@ index e9db4d2..24538f5 100644
 -            [self scrollToHorizontalOffset:self.scrollView.contentSize.width];
 +        // If scrolling is enabled:
 +        // - Scroll to the top when moving up and to the bottom when moving down.
-+        // - Similarly, scroll to the left when moving left and to the right when moving right.
++        // - Similarly, scroll towards leading edge when moving towards leading edge and to the trailing edge when moving towards the trailing edge.
++        BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++        BOOL isMovingTowardsLeadingEdge = (isRTL ? context.focusHeading == UIFocusHeadingRight : context.focusHeading == UIFocusHeadingLeft);
++        BOOL isMovingTowardsTrailingEdge = (isRTL ? context.focusHeading == UIFocusHeadingLeft : context.focusHeading == UIFocusHeadingRight);
 +        if (self.scrollView.isScrollEnabled) {
 +            if (context.focusHeading == UIFocusHeadingUp && self.snapToStart) {
 +                [self scrollToVerticalOffset:0.0];
 +            } else if(context.focusHeading == UIFocusHeadingDown && self.snapToEnd) {
 +                [self scrollToVerticalOffset:self.scrollView.contentSize.height];
-+            } else if(context.focusHeading == UIFocusHeadingLeft && self.snapToStart) {
++            } else if(isMovingTowardsLeadingEdge && self.snapToStart) {
 +                [self scrollToHorizontalOffset:0.0];
-+            } else if(context.focusHeading == UIFocusHeadingRight && self.snapToEnd) {
++            } else if(isMovingTowardsLeadingEdge && self.snapToEnd) {
 +                [self scrollToHorizontalOffset:self.scrollView.contentSize.width];
 +            }
          }
@@ -209,25 +407,31 @@ index e9db4d2..24538f5 100644
      }
  }
  
-@@ -1086,18 +1087,25 @@ - (void)handleTVNavigationEventNotification:(NSNotification *)notif
+@@ -1086,21 +1097,33 @@ - (void)handleTVNavigationEventNotification:(NSNotification *)notif
  
  - (BOOL)shouldUpdateFocusInContext:(UIFocusUpdateContext *)context
  {
+-    // Keep focus inside the scroll view till the end of the content
 +    // If the previously focused item is this view and scrolling is disabled, defer to the superclass
 +    if (context.previouslyFocusedItem == self && !self.scrollView.isScrollEnabled) {
 +        return [super shouldUpdateFocusInContext:context];
 +    }
 +
-     // Keep focus inside the scroll view till the end of the content
++    // Determine if the layout is Right-to-Left
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++    // Adjust for horizontal scrolling with RTL support
      if ([self isHorizontal:self.scrollView]) {
 -        if ((context.focusHeading == UIFocusHeadingLeft && self.scrollView.contentOffset.x > 0)
 -            || (context.focusHeading == UIFocusHeadingRight && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - self.scrollView.visibleSize.width)
 -        ) {
 -            return [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem];
-+        BOOL isMovingLeft = (context.focusHeading == UIFocusHeadingLeft && self.scrollView.contentOffset.x > 0);
-+        BOOL isMovingRight = (context.focusHeading == UIFocusHeadingRight && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - MAX(self.scrollView.visibleSize.width, 1));
++        BOOL isMovingTowardsLeadingEdge = (isRTL ? context.focusHeading == UIFocusHeadingRight : context.focusHeading == UIFocusHeadingLeft);
++        BOOL isMovingTowardsTrailingEdge = (isRTL ? context.focusHeading == UIFocusHeadingLeft : context.focusHeading == UIFocusHeadingRight);
 +
-+        if (isMovingLeft || isMovingRight) {
++        BOOL isScrollingToLeading = (isMovingTowardsLeadingEdge && self.scrollView.contentOffset.x > 0);
++        BOOL isScrollingToTrailing = (isMovingTowardsTrailingEdge && self.scrollView.contentOffset.x < self.scrollView.contentSize.width - MAX(self.scrollView.visibleSize.width, 1));
++
++        if (isScrollingToLeading || isScrollingToTrailing) {
 +            return (context.nextFocusedItem && [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem]);
          }
      } else {
@@ -235,6 +439,7 @@ index e9db4d2..24538f5 100644
 -            || (context.focusHeading == UIFocusHeadingDown && self.scrollView.contentOffset.y < self.scrollView.contentSize.height - self.scrollView.visibleSize.height)
 -        ) {
 -            return [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem];
++        // Handle vertical scrolling as before
 +        BOOL isMovingUp = (context.focusHeading == UIFocusHeadingUp && self.scrollView.contentOffset.y > 0);
 +        BOOL isMovingDown = (context.focusHeading == UIFocusHeadingDown && self.scrollView.contentOffset.y < self.scrollView.contentSize.height - MAX(self.scrollView.visibleSize.height, 1));
 +
@@ -242,8 +447,11 @@ index e9db4d2..24538f5 100644
 +            return (context.nextFocusedItem && [UIFocusSystem environment:self containsEnvironment:context.nextFocusedItem]);
          }
      }
+-
+     return [super shouldUpdateFocusInContext:context];
+ }
  
-@@ -1144,8 +1152,18 @@ - (void)scrollToVerticalOffset:(CGFloat)yOffset
+@@ -1144,11 +1167,21 @@ - (void)scrollToVerticalOffset:(CGFloat)yOffset
      _blockFirstTouch = NO;
      dispatch_async(dispatch_get_main_queue(), ^{
          CGFloat limitedOffset = yOffset;
@@ -262,8 +470,12 @@ index e9db4d2..24538f5 100644
 +
          [UIView animateWithDuration:[self swipeDuration] animations:^{
              self.scrollView.contentOffset =
-               CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
-@@ -1158,8 +1176,18 @@ - (void)scrollToHorizontalOffset:(CGFloat)xOffset
+-              CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
++            CGPointMake(self.scrollView.contentOffset.x, limitedOffset);
+         }];
+     });
+ }
+@@ -1158,11 +1191,21 @@ - (void)scrollToHorizontalOffset:(CGFloat)xOffset
      _blockFirstTouch = NO;
      dispatch_async(dispatch_get_main_queue(), ^{
          CGFloat limitedOffset = xOffset;
@@ -282,4 +494,30 @@ index e9db4d2..24538f5 100644
 +
          [UIView animateWithDuration:[self swipeDuration] animations:^{
              self.scrollView.contentOffset =
-               CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
+-              CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
++            CGPointMake(limitedOffset, self.scrollView.contentOffset.y);
+         }];
+     });
+ }
+@@ -1195,7 +1238,9 @@ - (void)swipedLeft
+         return;
+     }
+ 
+-    CGFloat newOffset = self.scrollView.contentOffset.x - [self swipeHorizontalInterval];
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++    NSInteger horizontalInterval = [self swipeHorizontalInterval];
++    CGFloat newOffset = self.scrollView.contentOffset.x + (isRTL ? horizontalInterval : -horizontalInterval);
+     // NSLog(@"Swiped left to %f", newOffset);
+     [self scrollToHorizontalOffset:newOffset];
+ }
+@@ -1206,7 +1251,9 @@ - (void)swipedRight
+         return;
+     }
+ 
+-    CGFloat newOffset = self.scrollView.contentOffset.x + [self swipeHorizontalInterval];
++    BOOL isRTL = [[RCTI18nUtil sharedInstance] isRTL];
++    NSInteger horizontalInterval = [self swipeHorizontalInterval];
++    CGFloat newOffset = self.scrollView.contentOffset.x + (isRTL ? -horizontalInterval : horizontalInterval);
+     // NSLog(@"Swiped right to %f", newOffset);
+     [self scrollToHorizontalOffset:newOffset];
+ }
